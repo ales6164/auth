@@ -2,15 +2,12 @@ package auth
 
 import (
 	"fmt"
-	"github.com/ales6164/apis"
-
 	"log"
 	"net/http"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
-	clog "google.golang.org/appengine/log"
 )
 
 // A function called whenever an error is encountered
@@ -67,7 +64,6 @@ func OnError(w http.ResponseWriter, r *http.Request, err string) {
 
 // New constructs a new Secure instance with supplied options.
 func middleware(options ...MiddlewareOptions) *JWTMiddleware {
-
 	var opts MiddlewareOptions
 	if len(options) == 0 {
 		opts = MiddlewareOptions{}
@@ -88,7 +84,6 @@ func middleware(options ...MiddlewareOptions) *JWTMiddleware {
 	}
 
 	return &JWTMiddleware{
-
 		Options: opts,
 	}
 }
@@ -99,31 +94,19 @@ func (m *JWTMiddleware) logf(format string, args ...interface{}) {
 	}
 }
 
-// Special implementation for optional auth authentication.
-/*func (m *JWTMiddleware) HandlerWithOptionalAuth(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	err := m.CheckJWT(w, r)
-
-	// If there was an error, do not call next.
-	if err == nil && next != nil {
-		next(w, r)
-	}
-}*/
-
 // Special implementation for Negroni, but could be used elsewhere.
 func (m *JWTMiddleware) HandlerWithNext(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	err := m.CheckJWT(w, r)
 
-	ctx := apis.NewContext(r)
-
-	if !ctx.IsAuthenticated {
-		ctx.PrintError(w, "unathorized", http.StatusUnauthorized)
-		return
-	}
-
-	context.Set(r, "context", ctx)
-
 	// If there was an error, do not call next.
-	if err == nil && next != nil {
+	if err != nil {
+		if len(m.Options.RedirectOnError) > 0 {
+			redirect(w, r, m.Options.RedirectOnError)
+		} else {
+			http.Error(w, "unathorized", http.StatusUnauthorized)
+		}
+		return
+	} else {
 		next(w, r)
 	}
 }
@@ -134,25 +117,16 @@ func (m *JWTMiddleware) Handler(h http.Handler) http.Handler {
 		// that indicates the request should not continue.
 		err := m.CheckJWT(w, r)
 
-		ctx := apis.NewContext(r)
-
 		// If there was an error, do not continue.
 		if err != nil {
-			clog.Debugf(ctx, "auth error: %s", err.Error())
 			if len(m.Options.RedirectOnError) > 0 {
 				redirect(w, r, m.Options.RedirectOnError)
 			} else {
-				ctx.PrintError(w, "unathorized", http.StatusUnauthorized)
+				http.Error(w, "unathorized", http.StatusUnauthorized)
 			}
 			return
 		}
 
-		if !ctx.IsAuthenticated {
-			ctx.PrintError(w, "unathorized", http.StatusUnauthorized)
-			return
-		}
-
-		context.Set(r, "context", ctx)
 		h.ServeHTTP(w, r)
 	})
 }
