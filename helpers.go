@@ -13,3 +13,15 @@ func UserKeyMiddleware(h http.Handler) http.Handler {
 		h.ServeHTTP(w, mux.SetURLVars(r, vars))
 	})
 }
+
+func CollectionMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		collectionKey := mux.Vars(r)["collection"]
+
+		// todo: check if has permission to edit
+		// how is with permissions for editing collection kinds???
+		//
+
+		//h.ServeHTTP(w, mux.SetURLVars(r, vars))
+	})
+}
